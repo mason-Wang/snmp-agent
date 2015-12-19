@@ -1,0 +1,283 @@
+/*  private_mib.h
+ *  Copyright (c) 2012 Joe Rawson, MIT License
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of this software 
+ * and associated documentation files (the "Software"), to deal in the Software without restriction, 
+ * including without limitation the rights to use, copy, modify, merge, publish, distribute, 
+ * sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is 
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all copies or 
+ * substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING 
+ * BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND 
+ * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, 
+ * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, 
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ *
+ * required by mib2.c for using private MIBs.
+ *
+ * I believe the private_mib mechanism in lwip is fundamentally broken
+ * for enterprise mibs. To preserve clean code and to modify lwip as little
+ * as possible, comment out #includes for private_mib.h in snmp_structs.h
+ * and snmp_msg.h and #include private_mib.h only in mib2.c, set LWIP_SNMP
+ * and SNMP_PRIVATE_MIB in opt.h, and put your entire implementation in
+ * private_mib.h. The reason for this is that it will be included in mib2.c
+ * and trying to have a separate private_mib.c doesn't seem
+ * to work for linking purposes.
+ *
+ * Author Joe Rawson
+ *
+ * The following implementation is loosely based on:
+ * http://mbed.org/users/lorcansmith/code/Enet_SPI/ by Lorcan Smith
+ * With many modifications for our specific implementation.
+ */
+ 
+#ifndef        __PRIVATE_MIB_H__
+#define        __PRIVATE_MIB_H__
+ 
+#include "lwip/opt.h"
+#include "lwip/snmp_asn1.h"
+#include "lwip/snmp_structs.h"
+
+ 
+#if        SNMP_PRIVATE_MIB
+ 
+#ifdef __cplusplus
+extern "C" {
+#endif
+ 
+#define        PSU_ENTERPRISE_ID   34509 // PSU, registered by
+                                         // Jim Stapleton
+#define        TheCAT_ORG_ID    200     // Assigned to theCAT by
+                                        // Jim Stapleton
+#define        SNMP_ID          161     // Assigned to SNMP agents by Dave Burns for theCAT.
+#define        BACON_ID         1       // Assigned to BACON by Dave Burns.
+#define        NUM_OF_SENSORS   4       // the number of sensors BACON has.
+ 
+// global variables we are returning to the NMS
+float temp = 1.5,humidity = 2.3,noise = 6.4,luminosity = 7.6;
+ 
+/********************************************************************
+ * Function declarations
+ *******************************************************************/
+ 
+// returns the definition of the object
+void BACON_get_obj_def(u8_t id_len, s32_t *id, struct obj_def *rv);
+ 
+// returns the value of the object
+void BACON_get_obj_val(struct obj_def *oid, u16_t length, void *value);
+ 
+ 
+/******************************************************************************
+ * BACON_get_obj_def
+ * Description: Sets the object definition for the sensors
+ * Parameters: u8_t id_len - length of branch id being given to us
+ *             s32_t *ident - pointer to array holding the id
+               struct obj_def *rv - struct we are returning our answer to
+ * Returns: through *rv, the definition of the object scalar being queried
+ ******************************************************************************/
+void BACON_get_obj_def(u8_t id_len, s32_t *id, struct obj_def *rv) {
+ 
+    u8_t oid = 0;
+ 
+    id_len += 1;
+    id -= 1;
+    LWIP_ASSERT("invalid id", (id[0] >= 0) && (id[0] <= 0xff));
+    if (id_len == 2) {
+    rv->id_inst_len = id_len;
+    rv->id_inst_ptr = id;
+    oid = (u8_t)id[0];
+    switch(oid) {
+        // the temperature
+        case 1: 
+        rv->instance    = MIB_OBJECT_SCALAR;
+        rv->access    = MIB_OBJECT_READ_ONLY;
+        rv->asn_type    = (SNMP_ASN1_UNIV | SNMP_ASN1_PRIMIT | SNMP_ASN1_INTEG);
+        rv->v_len    = sizeof(u32_t);
+        break;
+        case 2: 
+        rv->instance    = MIB_OBJECT_SCALAR;
+        rv->access    = MIB_OBJECT_READ_ONLY;
+        rv->asn_type    = (SNMP_ASN1_UNIV | SNMP_ASN1_PRIMIT | SNMP_ASN1_INTEG);
+        rv->v_len    = sizeof(u32_t);
+        break;
+        case 3: 
+        rv->instance    = MIB_OBJECT_SCALAR;
+        rv->access    = MIB_OBJECT_READ_ONLY;
+        rv->asn_type    = (SNMP_ASN1_UNIV | SNMP_ASN1_PRIMIT | SNMP_ASN1_INTEG);
+        rv->v_len    = sizeof(u32_t);
+        break;
+        case 4: 
+        rv->instance    = MIB_OBJECT_SCALAR;
+        rv->access    = MIB_OBJECT_READ_ONLY;
+        rv->asn_type    = (SNMP_ASN1_UNIV | SNMP_ASN1_PRIMIT | SNMP_ASN1_INTEG);
+        rv->v_len    = sizeof(u32_t);
+        break;
+    }
+    } else {
+    LWIP_DEBUGF(SNMP_MIB_DEBUG,("\r\nBACON_get_obj_def: no scalar\r\n"));
+    rv->instance = MIB_OBJECT_NONE;
+    }
+}
+ 
+ 
+/******************************************************************************
+ * BACON_get_obj_val
+ * Description: Sets the returned value for the sensors
+ * Parameters: struct obj_def *od - object found from obj_def
+ *             u16_t length - the length of what we are being asked (in bytes)
+ *             void *value - points to (varbind) space to copy value into
+ * Returns: in *value
+ ******************************************************************************/
+void BACON_get_obj_val(struct obj_def *od, u16_t length, void *value) {
+    
+    u8_t oid = 0;
+ 
+    u32_t *int_ptr = (u32_t*)value;
+ 
+  //  LWIP_UNUSED_ARG(length);
+    LWIP_ASSERT("invalid id", (od->id_inst_ptr[0] >=0) && (od->id_inst_ptr[0] <= NUM_OF_SENSORS));
+    
+    oid = (u8_t)od->id_inst_ptr[0];
+    switch(oid) {
+    // since we can't use floats, multiply the floats by 100 and cast to ints.
+    case 1:
+        *int_ptr = (int)(temp * 100);
+        break;
+    case 2:
+        *int_ptr = (int)(humidity * 100);
+        break;
+    case 3:
+        *int_ptr = (int)(luminosity * 100);
+        break;
+    case 4:
+        *int_ptr = (int)(noise * 100);
+        break;
+    }
+}
+ 
+ 
+/********************************************************************
+ * MIB structures
+ *******************************************************************/
+ 
+// defines the scalars used to return sensor values.
+const mib_scalar_node BACON_sensor = {
+    &BACON_get_obj_def,
+    &BACON_get_obj_val,
+    &noleafs_set_test,
+    &noleafs_set_value,
+    MIB_NODE_SC,
+    0
+};
+ 
+// The OIDs for the sensor scalars.
+const s32_t BACON_sensor_oids[4] = { 1, 2, 3, 4 };
+// The actual structure that holds the nodes.
+struct mib_node* const BACON_sensor_nodes[4] = {
+(struct mib_node*)&BACON_sensor, (struct mib_node*)&BACON_sensor,
+(struct mib_node*)&BACON_sensor, (struct mib_node*)&BACON_sensor 
+};
+ 
+// 1.3.6.1.4.1.34509.200.161.1.[1234]
+const struct mib_array_node BACON_sensors = {
+    &noleafs_get_object_def,
+    &noleafs_get_value,
+    &noleafs_set_test,
+    &noleafs_set_value,
+    MIB_NODE_AR,
+    4,
+    BACON_sensor_oids,
+    BACON_sensor_nodes
+};
+ 
+// putting them together.
+const s32_t BACON_oids[1] = { BACON_ID };
+struct mib_node* const BACON_nodes[1] = {
+    (struct mib_node*)&BACON_sensors
+};
+// 1.3.6.1.4.1.34509.200.161.1
+const struct mib_array_node BACON_mib = {
+    &noleafs_get_object_def,
+    &noleafs_get_value,
+    &noleafs_set_test,
+    &noleafs_set_value,
+    MIB_NODE_AR,
+    1,
+    BACON_oids,
+    BACON_nodes
+};
+ 
+ 
+// 1.3.6.1.4.1.34509.200.161
+// defines BACON
+const s32_t BACON_ids[1] = { SNMP_ID };
+struct mib_node* const BACON_sections[1] = {(struct mib_node*)&BACON_mib};
+const struct mib_array_node mib_BACON = {
+    &noleafs_get_object_def,
+    &noleafs_get_value,
+    &noleafs_set_test,
+    &noleafs_set_value,
+    MIB_NODE_AR,
+    1,
+    BACON_ids,
+    BACON_sections
+};
+ 
+// 1.3.6.1.4.1.34509.200
+// defines TheCAT
+const s32_t CAT_oids[3] = { TheCAT_ORG_ID };
+struct mib_node* const CAT_nodes[1] = {(struct mib_node*)&mib_BACON};
+const struct mib_array_node CAT_mib = {
+    &noleafs_get_object_def,
+    &noleafs_get_value,
+    &noleafs_set_test,
+    &noleafs_set_value,
+    MIB_NODE_AR,
+    1,
+    CAT_oids,
+    CAT_nodes
+};
+ 
+// 1.3.6.1.4.1.34509
+// defines PSU_ENTERPRISE_ID
+const s32_t private_oids[1] = { PSU_ENTERPRISE_ID };
+struct mib_node* const private_nodes[1] = {(struct mib_node*)&CAT_mib};
+// performs the linkage to the enterprise branch.
+const struct mib_array_node mib_enterprise = {
+    &noleafs_get_object_def,
+    &noleafs_get_value,
+    &noleafs_set_test,
+    &noleafs_set_value,
+    MIB_NODE_AR,
+    1,
+    private_oids,
+    private_nodes
+};
+ 
+// 1.3.6.1.4.1
+// links our mibs to the private branch
+const s32_t ent_oids[1] = { 1 };
+struct mib_node* const ent_nodes[1] = { (struct mib_node*)&mib_enterprise };
+ 
+ 
+const struct mib_array_node private = {
+    &noleafs_get_object_def,
+    &noleafs_get_value,
+    &noleafs_set_test,
+    &noleafs_set_value,
+    MIB_NODE_AR,
+    1,
+    ent_oids,
+    ent_nodes
+};
+ 
+#ifdef __cplusplus
+}
+#endif
+ 
+#endif       // SNMP_PRIVATE_MIB
+#endif       // __PRIVATE_MIB_H__
+ 
